@@ -54,6 +54,7 @@ def read_graph(lastfile):
 def write_graph(db,outfile):
     with open(outfile,'w') as fout:
         for name,entry in db.items():
+            # Skip entries for query sequences
             if 'name1' in entry:
                 continue
             name1, score, name2 = name, entry['score'], entry['name2']

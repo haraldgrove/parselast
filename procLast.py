@@ -11,65 +11,17 @@ import argparse
 import time
 import sys
 
-
-class Last(object):
-
-    def __init__(self, lastfile):
-        self.lastfile = lastfile
-        self.lines = []
-        self.db = {}
-        self.header = []
-
-    def _calc_seqid(self, score, blocks):
-        alnSize = 0
-        gaps = 0
-        gapSize = 0
-        for b in blocks.split(','):
-            if ':' in b:
-                gap = max([int(a) for a in b.split(':')])
-                gaps += gap
-                gapSize += (21 + 9 * gap)
-            else:
-                alnSize += int(b)
-        mismatch = ((alnSize * 6 - gapSize) - score ) / 24
-        return 1 - (mismatch + gaps) / (gaps + alnSize)
-
-    def read_last(self, makedb = False, seqid = 0, length = 0):
-        head = True
-        with open(self.lastfile, 'r') as fin:
-            for line in fin:
-                if line.startswith('#'):
-                    if head:
-                        self.header.append(line)
-                    continue
-                head = False
-                l = line.strip().split()
-                if len(l) != 14:
-                    continue
-                score, start1, alnSize1, seqSize1, \
-                start2, alnSize2, seqSize2 = [int(i) for i in [l[0], l[2], l[3], l[5], l[7], l[8], l[10]]]
-                name1, strand1, \
-                name2, strand2, blocks, *e = [l[1], l[4], l[6], l[9], l[11],l[12:]]
-                end1 = start1 + alnSize1
-                end2 = start2 + alnSize2
-                if strand2 == '-':
-                    start2p = seqSize2 - end2
-                    end2p = seqSize2 - start2
-                else:
-                    start2p = start2
-                    end2p = end2
-                seqid = 100 * self._calc_seqid(score, blocks)
-                self.lines.append([score, seqid, name1, start1, alnSize1, end1, strand1, seqSize1,
-                                   name2, start2, alnSize2, end2, strand2, seqSize2, blocks,
-                                   start2p, end2p])
-
-
-    def write_last(self, fout = sys.stdout):
-        for line in self.header:
-            fout.write(line)
-        for line in self.lines:
-            output = '\t'.join([str(b) for b in line])
-            fout.write('{}\n'.format(output))
+def read_last(infile):
+    db = {}
+    with open(infile, 'r') as fin:
+        for line in fin:
+            if line.startswith('#'):
+                continue
+            score, name1, start1, alnSize1, strand1, seqSize1, \
+            name2, start2, alnSize2, strand2, seqSize2, blocks, *e =\
+            line.strip().split()
+            if name2 not in db:
+                db[name2] = {'name1':name1}
 
 def single_hit_qc(lastfile):
     """ Removes single lines from alignment based on:
@@ -458,12 +410,25 @@ def filter_gap_bed(lastfile, bedfile):
 
 def main(args):
     """ Main entry point of the app """
-    last = Last(args.infile)
-    last.read_last()
-    if args.outfile is not None:
-        last.write_last(open(args.outfile, 'w'))
+    if args.option == 'read_graph':
+        db = read_graph(args.infile)
+        write_graph(db, args.outfile)
+    elif args.option == 'single_hit_qc':
+        single_hit_qc(args.infile)
+    elif args.option == 'unique_match':
+        unique_match(args.infile)
+    elif args.option == 'otm_match':
+        otm_match(args.infile)
+    elif args.option == 'repeat_ctgs':
+        repeat_ctgs(args.infile)
+    elif args.option == 'gather_network':
+        gather_network(args.infile)
+    elif args.option == 'filter_bed':
+        filter_bed(args.infile, args.bedfile)
+    elif args.option == 'filter_gap_bed':
+        filter_gap_bed(args.infile, args.bedfile)
     else:
-        last.write_last()
+        sys.stderr.write('Unknown operation: [{}]\n'.format(args.option))
     if args.log:
         with open('README.txt', 'a') as fout:
             fout.write('[{}]\t[{}]\n'.format(time.asctime(), ' '.join(sys.argv)))
@@ -474,7 +439,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Required positional argument
-    #parser.add_argument("option", help="Action to take")
+    parser.add_argument("option", help="Action to take")
     parser.add_argument("infile", help="Input file")
 
     # Optional argument flag which defaults to False

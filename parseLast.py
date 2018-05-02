@@ -34,7 +34,15 @@ class Last(object):
         mismatch = ((alnSize * 6 - gapSize) - score ) / 24
         return 1 - (mismatch + gaps) / (gaps + alnSize)
 
-    def read_last(self, makedb = False, seqid = 0, length = 0):
+    def read_last(self, makedb = False, idlim = 0, covlim = 0, lenlim = 0):
+        """
+        Reads each alignment from the last-alignment file.
+        :param makedb:
+        :param idlim: Minimum percent identity, in percent
+        :param covlim: Minimum coverage, in percent
+        :param lenlim: Minimum alignment length
+        :return:
+        """
         head = True
         with open(self.lastfile, 'r') as fin:
             for line in fin:
@@ -63,6 +71,13 @@ class Last(object):
                     seqcov = 100 * (alnSize2 / seqSize2)
                 else:
                     seqcov = 100 * (alnSize1 / seqSize1)
+                # Deciding to keep the alignment
+                if seqid < idlim:
+                    continue
+                if alnSize2 < lenlim:
+                    continue
+                if seqcov < covlim:
+                    continue
                 self.lines.append([score, seqid, seqcov, name1, start1, alnSize1, end1, strand1, seqSize1,
                                    name2, start2, alnSize2, end2, strand2, seqSize2, blocks,
                                    start2p, end2p])
@@ -70,6 +85,15 @@ class Last(object):
 
     def write_last(self, fout = sys.stdout):
         for line in self.header:
+            l = line.strip().split()
+            if len(l) > 1 and l[1] == 'score':
+                l.insert(2,'idpct')
+                l.insert(3,'covpct')
+                l.insert(7, 'end1')
+                l.insert(13,'end2')
+                l.append('start2+')
+                l.append('end2+')
+            line = '{}\n'.format('\t'.join(l))
             fout.write(line)
         for line in self.lines:
             output = '\t'.join([str(b) for b in line])
@@ -463,7 +487,8 @@ def filter_gap_bed(lastfile, bedfile):
 def main(args):
     """ Main entry point of the app """
     last = Last(args.infile)
-    last.read_last()
+    idlim, covlim, lenlim = [int(a) for a in args.limits.split(',')]
+    last.read_last(idlim=idlim, covlim=covlim, lenlim=lenlim)
     if args.outfile is not None:
         last.write_last(open(args.outfile, 'w'))
     else:
@@ -486,8 +511,9 @@ if __name__ == "__main__":
 
     # Optional argument which requires a parameter (eg. -d test)
     parser.add_argument("-o", "--outfile", help="Output file")
-    parser.add_argument("-b", "--bedfile", help='bed-file')
-    parser.add_argument("-n", "--name", action="store", dest="name")
+    parser.add_argument("-c", "--limits", default="0,0,0", help="Minimum idpct, covpct and length")
+    #parser.add_argument("-b", "--bedfile", help='bed-file')
+    #parser.add_argument("-n", "--name", action="store", dest="name")
 
     # Optional verbosity counter (eg. -v, -vv, -vvv, etc.)
     parser.add_argument(

@@ -10,6 +10,7 @@ __license__ = "MIT"
 import argparse
 import time
 import sys
+import pandas as pd
 
 
 class Last(object):
@@ -17,7 +18,6 @@ class Last(object):
     def __init__(self, lastfile):
         self.lastfile = lastfile
         self.lines = []
-        self.db = {}
         self.header = []
 
     def _calc_seqid(self, score, blocks):
@@ -34,7 +34,7 @@ class Last(object):
         mismatch = ((alnSize * 6 - gapSize) - score ) / 24
         return 1 - (mismatch + gaps) / (gaps + alnSize)
 
-    def read_last(self, makedb = False, idlim = 0, covlim = 0, lenlim = 0):
+    def read_last(self, idlim = 0, covlim = 0, lenlim = 0):
         """
         Reads each alignment from the last-alignment file.
         :param makedb:
@@ -93,11 +93,69 @@ class Last(object):
                 l.insert(13,'end2')
                 l.append('start2+')
                 l.append('end2+')
-            line = '{}\n'.format('\t'.join(l))
+            else:
+                continue
+            line = '{}\n'.format('\t'.join(l[1:]))
             fout.write(line)
         for line in self.lines:
             output = '\t'.join([str(b) for b in line])
             fout.write('{}\n'.format(output))
+
+class Last2(object):
+
+    def __init__(self, lastfile):
+        self.lastfile = lastfile
+        self.lines = []
+        self.db = {}
+        self.header = []
+        self.name1list = []
+        self.name2list = []
+
+    def read_last(self):
+        """
+        columns: 0 - score, 1 - seqid, 2 - seqcov,
+                 3 - name1, 4 - start1, 5 - alnSize1, 6 - end1, 7 - strand1, 8 - seqSize1,
+                 9 - name2, 10 - start2, 11 - alnSize2, 12 - end2, 13 - strand2, 14 - seqSize2, 15 - blocks,
+                 16 - start2p, 17 - end2p
+        :return:
+        """
+        self.df = pd.read_table(self.lastfile, header = 0)
+
+    def check_name2(self, name):
+        df1 = self.df[['name2']==name]
+        df1.sort_values(by='start2p')
+        for ind in range(1,len(df1)-1):
+            row0 = df1[ind-1]
+            row1 = df1[ind]
+            row2 = df1[ind+1]
+            before2 = row1['start2p'] - row0['end2p']
+            after2 = row2['start2p'] - row1['end2p']
+            if row0['name1'] == row1['name1']: # This part assumes that 'name1' is not misassembled...
+                if row1['strand2'] == '+':
+                    before1 = row1['start1'] - row0['end1']
+                else:
+                    before1 = row0['start1'] - row1['end1']
+            else:
+                if row1['strand2'] == '+':
+                    before1_1 = row1['start1']
+                else:
+                    before1_1 = (row1['seqSize1'] - row1['end1'])
+                if row0['strand2'] == '+':
+                    before1_2 = (row0['seqSize1'] - row0['end1'])
+                else:
+                    before1_2 = row0['start1']
+                before1 = before1_1 + before1_2
+                if row1['strand2'] == '+':
+                    after1_1 = (row1['seqSize1'] - row1['end1'])
+                else:
+                    after1_1 = row1['start1']
+                if row2['strand2'] == '+':
+                    after1_2 = row2['start1']
+                else:
+                    after1_2 = (row2['seqSize1'] - row2['end1'])
+                after1 = after1_1 + after1_2
+            print(ind, before1, before2)
+            print(ind, after1, after2)
 
 def single_hit_qc(lastfile):
     """ Removes single lines from alignment based on:

@@ -59,7 +59,11 @@ class Last(object):
                     start2p = start2
                     end2p = end2
                 seqid = 100 * self._calc_seqid(score, blocks)
-                self.lines.append([score, seqid, name1, start1, alnSize1, end1, strand1, seqSize1,
+                if seqSize2 <= seqSize1:
+                    seqcov = 100 * (alnSize2 / seqSize2)
+                else:
+                    seqcov = 100 * (alnSize1 / seqSize1)
+                self.lines.append([score, seqid, seqcov, name1, start1, alnSize1, end1, strand1, seqSize1,
                                    name2, start2, alnSize2, end2, strand2, seqSize2, blocks,
                                    start2p, end2p])
 

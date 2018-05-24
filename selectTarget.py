@@ -5,7 +5,7 @@ import sys
 chrom = sys.argv[1]
 start, stop = int(sys.argv[2]), int(sys.argv[3])
 for line in sys.stdin:
-    if line.startswith('#'):
+    if line.startswith("#"):
         continue
     line_l = line.strip().split()
     try:

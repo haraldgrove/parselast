@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 Module Docstring
+Calculates id% and cov% for all last hits.
+Adds columns for end coordinate and for positive strand coordinates for Query.
 """
 
 __author__ = "Harald Grove"
